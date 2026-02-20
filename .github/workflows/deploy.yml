@@ -1,0 +1,48 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push agent
+        uses: docker/build-push-action@v5
+        with:
+          context: ./agent
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/voice-agent:${{ github.sha }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/voice-frontend:${{ github.sha }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/voice-agent voice-agent=${{ secrets.DOCKERHUB_USERNAME }}/voice-agent:${{ github.sha }}
+          kubectl set image deployment/voice-frontend voice-frontend=${{ secrets.DOCKERHUB_USERNAME }}/voice-frontend:${{ github.sha }}
+          kubectl rollout status deployment/voice-agent --timeout=120s
+          kubectl rollout status deployment/voice-frontend --timeout=120s
