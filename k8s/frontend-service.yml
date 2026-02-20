@@ -1,0 +1,16 @@
+# Service to expose the frontend pods within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  # Name used to reference this service from other resources (e.g. Ingress)
+  name: voice-frontend
+spec:
+  # ClusterIP makes this service reachable only within the cluster
+  type: ClusterIP
+  # Route traffic to pods with this label
+  selector:
+    app: voice-frontend
+  ports:
+    # Accept traffic on port 80 and forward it to port 3000 on the pods
+    - port: 80
+      targetPort: 3000

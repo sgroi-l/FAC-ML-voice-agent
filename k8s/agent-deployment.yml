@@ -1,0 +1,46 @@
+# Deployment for the LiveKit voice agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Name used to identify this deployment in the cluster
+  name: voice-agent
+spec:
+  # Run a single instance of the agent
+  replicas: 1
+  # How the deployment finds which pods to manage
+  selector:
+    matchLabels:
+      app: voice-agent
+  template:
+    metadata:
+      # Labels applied to each pod created by this deployment
+      labels:
+        app: voice-agent
+    spec:
+      containers:
+        - name: voice-agent
+          # Docker Hub image - replace izaaksofer with your Docker Hub username
+          image: sgroil/voice-agent:latest
+          # Load all environment variables from the Kubernetes secret
+          envFrom:
+            - secretRef:
+                name: voice-agent-secrets
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi

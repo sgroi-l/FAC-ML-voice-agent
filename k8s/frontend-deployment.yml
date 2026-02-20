@@ -1,0 +1,49 @@
+# Deployment for the Next.js frontend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Name used to identify this deployment in the cluster
+  name: voice-frontend
+spec:
+  # Run a single instance of the frontend
+  replicas: 1
+  # How the deployment finds which pods to manage
+  selector:
+    matchLabels:
+      app: voice-frontend
+  template:
+    metadata:
+      # Labels applied to each pod created by this deployment
+      labels:
+        app: voice-frontend
+    spec:
+      containers:
+        - name: voice-frontend
+          # Docker Hub image - replace izaaksofer with your Docker Hub username
+          image: sgroil/voice-frontend:latest
+          # Expose port 3000 where Next.js listens
+          ports:
+            - containerPort: 3000
+          # Load all environment variables from the Kubernetes secret
+          envFrom:
+            - secretRef:
+                name: voice-agent-secrets
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi

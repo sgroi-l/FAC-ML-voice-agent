@@ -1,0 +1,28 @@
+# Ingress to expose the frontend to the internet via a domain name
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  # Name used to identify this ingress resource
+  name: voice-frontend
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+    - hosts:
+        - workshop.sgroi.dev
+      secretName: voice-frontend-tls
+  rules:
+    # Route traffic for this hostname - replace with your actual domain
+    - host: workshop.sgroi.dev
+      http:
+        paths:
+          # Match all paths and send them to the frontend service
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                # Name of the Service to route traffic to
+                name: voice-frontend
+                port:
+                  # Port on the Service (not the container)
+                  number: 80
