@@ -1,3 +1,5 @@
+import os
+import asyncpg
 from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import AgentServer, AgentSession, Agent, room_io, function_tool
@@ -5,9 +7,20 @@ from livekit.plugins import openai, noise_cancellation
 
 load_dotenv(".env.local")
 
-# Simple in-memory storage for notes
-memory = {}
+db_pool = None
 
+async def get_pool():
+    global db_pool
+    if db_pool is None:
+        db_pool = await asyncpg.create_pool(os.environ["DATABASE_URL"])
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS notes (
+                    id SERIAL PRIMARY KEY,
+                    content TEXT NOT NULL
+                )
+            """)
+    return db_pool
 
 class VoiceAgent(Agent):
     def __init__(self):
@@ -15,7 +28,6 @@ class VoiceAgent(Agent):
             instructions="""
                 You are a helpful assistant communicating via voice.
                 Keep your responses concise and conversational.
-
                 You have the ability to remember things for the user.
                 When they ask you to remember something, use the save_note tool.
                 When they ask what you've saved or to recall something, use the get_notes tool.
@@ -25,32 +37,34 @@ class VoiceAgent(Agent):
     @function_tool
     async def save_note(self, note: str) -> str:
         """Save a note to memory. Use this when the user asks you to remember something."""
-        note_id = len(memory) + 1
-        memory[note_id] = note
-        return f"Saved note #{note_id}: {note}"
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "INSERT INTO notes (content) VALUES ($1) RETURNING id", note
+            )
+            return f"Saved note #{row['id']}: {note}"
 
     @function_tool
     async def get_notes(self) -> str:
         """Retrieve all saved notes. Use this when the user asks what you've remembered."""
-        if not memory:
-            return "No notes saved yet."
-        return "\n".join([f"#{id}: {note}" for id, note in memory.items()])
-
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch("SELECT id, content FROM notes ORDER BY id")
+            if not rows:
+                return "No notes saved yet."
+            return "\\n".join([f"#{row['id']}: {row['content']}" for row in rows])
 
 server = AgentServer()
-
 
 @server.rtc_session()
 async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
-
     session = AgentSession(
         llm=openai.realtime.RealtimeModel(
             voice="alloy",
             model="gpt-realtime-mini",
         )
     )
-
     await session.start(
         room=ctx.room,
         agent=VoiceAgent(),
