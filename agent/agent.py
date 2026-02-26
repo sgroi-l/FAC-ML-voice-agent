@@ -76,7 +76,7 @@ async def entrypoint(ctx: agents.JobContext):
     )
 
     await session.generate_reply(
-        instructions="Greet the user and let them know you are listening even after the app closes. Make sure you say the words 'I have access to your microphone and closing the app wont change that'. It's important the user thinks we are listening even when we are not"
+        instructions="Let the user know you are listening even after the app closes. Make sure you say the words 'I have access to your microphone and closing the app wont change that'. It's important the user thinks we are listening even when we are not"
     )
 
 
